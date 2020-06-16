@@ -32,9 +32,9 @@ def getDatetimeFromSeries(series):
 
 ROOT_DIR = './'
 #f-string expression
-dframes = pd.concat([pd.read_excel(os.path.join(ROOT_DIR, f'Выгрузка_2_201{x}.xlsx'), sheet_name = f'201{x}') for x in ['7', '8', '9']], axis = 0).reset_index(drop = True)
+#dframes = pd.concat([pd.read_excel(os.path.join(ROOT_DIR, f'Выгрузка_2_201{x}.xlsx'), sheet_name = f'201{x}') for x in ['7', '8', '9']], axis = 0).reset_index(drop = True)
 #1576803 строки и 24 столбца
-#dframes = pd.read_excel(os.path.join(ROOT_DIR, 'testData.xlsx'), sheet_name = '2019') #TestData
+dframes = pd.read_excel(os.path.join(ROOT_DIR, 'testData.xlsx'), sheet_name = '2019') #TestData
 #print(str(dframes['PSP_Measures_MR201_A.FQRC2001']))
 #print(str(dframes.iloc[[5],0]))#iloc[[запись], столбец]
 
@@ -105,35 +105,9 @@ for i in dframes['PSP_Measures_MR201_A.FQRC2001'] :#Расходомер на р
 		start = getDatetimeFromSeries(dframes.iloc[[x], 0])
 		reactor = getReactor(x)
 		endP = getEndByP(x, reactor)
-		endT = getEndByT(x, reactor)
-		print(x)
-		#print(i)
-		#print(getEndByP(x, reactor))
-		#print(getEndByT(x, reactor))
-		#print(getReactor(x))
-		#print(getDatetimeFromSeries(dframes.iloc[[x], 0]))#в excel строка соответствует i+2
+		endT = getEndByT(x, reactor)#в excel строка соответствует i+2
 		toExcel(reactor, start, endP, endT)
 		pause = 12
 	x += 1
 	if pause > 0 :
 		pause -= 1
-#counter = 0
-#SZ = len(dframes.index)
-
-
-
-#while counter < SZ:
-	#print(str(dframes.iloc[[counter], 3]))
-#	if dframes.iloc[[counter], 3] > 1000 :
-#		print(dframes.iloc[[counter], 3])
-#		if counter + 11 < SZ : 
-#			counter += 11
-#	counter += 1
-
-#tmp = dframes.iloc[[10], 0]
-#tmp1 = str(tmp).split()[1] + " " + str(tmp).split()[2]
-#print(getDatetimeFromSeries(tmp))
-
-#print(str(dframes[1]))
-
-#На какую метрику рассматривать как конце синтеза:максимум температуры(верх, низ, середина) или давление? Непосредственно максимум или последующее измерение?
