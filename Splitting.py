@@ -36,10 +36,12 @@ def getDatetimeFromSeries(series):
 
 ROOT_DIR = './'
 MAIN_LIST = []
+ERRORS_LIST = []
 SYNT_START_VALUE = 30000 #753 строка 2019
 
-dframes = pd.read_excel(os.path.join(ROOT_DIR, 'testData.xlsx'), sheet_name = '2019') #TestData
-#dframes = join.load()
+#dframes = pd.read_excel(os.path.join(ROOT_DIR, 'testData.xlsx'), sheet_name = '2019') #TestData
+dframes = join.load()
+print('dataframe загружен')
 
 #print(str(dframes.iloc[[5],0]))#iloc[[запись], столбец]
 
@@ -80,7 +82,6 @@ def getReactor(row):
 	#print('A' ,A[row - 1], A[row])
 	#print('B' ,B[row - 1], B[row])
 	#print('C' ,C[row - 1], C[row])
-
 	if (A[row - 1] < 1) and ((A[row] > A[row - 1]) or (A[row + 1] > A[row])):
 		return 'A'
 	if (B[row - 1] < 1) and ((B[row] > B[row - 1]) or (B[row + 1] > B[row])):
@@ -137,23 +138,33 @@ def getEndByT(fromRow, reactor):
 x = 0
 pause = 0 #Пауза между синтезами
 for i in dframes['PSP_Measures_MR201_A.FQRC2001'] :#Расходомер на растворителе
+	print(x)
 	if i > SYNT_START_VALUE and pause == 0:
 		start = getDatetimeFromSeries(dframes.iloc[[x], 0])
-		reactor = getReactor(x)
-		endByP = getEndByP(x, reactor)
-		endByT = getEndByT(x, reactor)#в excel строка соответствует i+2
+		try:
+			reactor = getReactor(x)
+			#endByP = getEndByP(x, reactor)
+			endByT = getEndByT(x, reactor)#в excel строка соответствует i+2
+		except KeyError as e:
+			x += 1
+			continue
+		
+		
 		try:
 			duration = endByT - start
 			print(duration)
 		except TypeError as e:
 			duration = 'ошибка'
-		
-		MAIN_LIST.append({'Реактор':reactor, 'Начало синтеза':str(start), 'Конец синтеза': str(endByT), 'Длительность синтеза':str(duration) })
+		if reactor is None:#Добавить условие, что если duration больше 3 часов, например, то это ошибка
+			ERRORS_LIST.append({'Реактор':reactor, 'Начало синтеза':str(start), 'Конец синтеза': str(endByT), 'Длительность синтеза':str(duration)})
+		else:
+			MAIN_LIST.append({'Реактор':reactor, 'Начало синтеза':str(start), 'Конец синтеза': str(endByT), 'Длительность синтеза':str(duration)})
 		#toExcel(reactor, start, endP, endT)
-		pause = 12
+		pause = 12#Избавиться
 	x += 1
 	if pause > 0 :
 		pause -= 1
 
 
 pd.DataFrame(MAIN_LIST).to_excel('output.xlsx')
+pd.DataFrame(ERRORS_LIST).to_excel('errors.xlsx')
