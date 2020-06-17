@@ -3,6 +3,8 @@ import os
 import xlwt
 import xlrd
 from xlutils.copy import copy
+import join
+from datetime import datetime
 
 print("Start")
 def newExcel():
@@ -28,17 +30,19 @@ def toExcel(reactor, start, endP, endT):
 	wb.save('res.xls')
 
 def getDatetimeFromSeries(series):
-	return str(series).split()[1] + " " + str(series).split()[2]
+	tmp = str(series).split()[1] + " " + str(series).split()[2]
+	tmp = tmp.split('.')[0]
+	return datetime.strptime(tmp, '%Y-%m-%d %H:%M:%S')
 
 ROOT_DIR = './'
-#f-string expression
-#dframes = pd.concat([pd.read_excel(os.path.join(ROOT_DIR, f'Выгрузка_2_201{x}.xlsx'), sheet_name = f'201{x}') for x in ['7', '8', '9']], axis = 0).reset_index(drop = True)
-#1576803 строки и 24 столбца
+MAIN_LIST = []
+SYNT_START_VALUE = 30000 #753 строка 2019
+
 dframes = pd.read_excel(os.path.join(ROOT_DIR, 'testData.xlsx'), sheet_name = '2019') #TestData
-#print(str(dframes['PSP_Measures_MR201_A.FQRC2001']))
+#dframes = join.load()
+
 #print(str(dframes.iloc[[5],0]))#iloc[[запись], столбец]
 
-#newExcel()
 #Проходим по столбцу с растворителем, если больше 1000, то
 #считаем что синтез начался. Определяем какой реактор по росту давления. Ищем максимумы температуры и давления,
 #как метки окончания синтеза(ближайшая максимальная температура с t > 70 и 
@@ -51,26 +55,47 @@ Cp = 'PSP_MR201_C.PIRSA2015' #S
 At = 'PSP_MR201_A.TRSA2013' #K
 Bt = 'PSP_MR201_B.TRSA2018' #P
 Ct = 'PSP_MR201_C.TRSA2023' #U
-#найти причину, по которой возвращает None
-def getReactor(fromRow):#Определяет название реактора,
+#Уровень
+Al = 'PSP_MR201_A.LIRSA2011' #Y
+Bl = 'PSP_MR201_B.LIRSA2014' #Z
+Cl = 'PSP_MR201_C.LIRSA2017' #AA
+
+
+def getReactorByP(fromRow):#Определяет название реактора,
 	A = dframes[Ap]
 	B = dframes[Bp]
 	C = dframes[Cp]
 	i = fromRow + 2
 	if (A[i] < 0.1) and (A[i+4] < A[i+5]): 
-		return 'А'
+		return 'A'
 	if (B[i] < 0.1) and (B[i+4] < B[i+5]):
-		return 'Б'
+		return 'B'
 	if (C[i] < 0.1) and (C[i+4] < C[i+5]):
-		return 'В'
+		return 'C'
+
+def getReactor(row):
+	A = dframes[Al]
+	B = dframes[Bl]
+	C = dframes[Cl]
+	#print('A' ,A[row - 1], A[row])
+	#print('B' ,B[row - 1], B[row])
+	#print('C' ,C[row - 1], C[row])
+
+	if (A[row - 1] < 1) and ((A[row] > A[row - 1]) or (A[row + 1] > A[row])):
+		return 'A'
+	if (B[row - 1] < 1) and ((B[row] > B[row - 1]) or (B[row + 1] > B[row])):
+		return 'B'
+	if (C[row - 1] < 1) and ((C[row] > C[row - 1]) or (C[row + 1] > C[row])):
+		return 'C'
+
 
 #Возвращает дату окончания синтеза по Р
 def getEndByP(fromRow, reactor):
-	if reactor == 'А':
+	if reactor == 'A':
 		p = dframes[Ap]
-	if reactor == 'Б':
+	if reactor == 'B':
 		p = dframes[Bp]
-	if reactor == 'В':
+	if reactor == 'C':
 		p = dframes[Cp]
 	row = fromRow + 20
 	if reactor is None:
@@ -82,11 +107,11 @@ def getEndByP(fromRow, reactor):
 			row += 1
 
 def getEndByT(fromRow, reactor):
-	if reactor == 'А':
+	if reactor == 'A':
 		t = dframes[At]
-	if reactor == 'Б':
+	if reactor == 'B':
 		t = dframes[Bt]
-	if reactor == 'В':
+	if reactor == 'C':
 		t = dframes[Ct]
 	row = fromRow + 20
 	if reactor is None:
@@ -97,17 +122,38 @@ def getEndByT(fromRow, reactor):
 		else:
 			row += 1
 
-newExcel()	
+
+
+
+
+
+
+
+
+
+
+
+#newExcel()	
 x = 0
 pause = 0 #Пауза между синтезами
 for i in dframes['PSP_Measures_MR201_A.FQRC2001'] :#Расходомер на растворителе
-	if i > 1000 and pause == 0:
+	if i > SYNT_START_VALUE and pause == 0:
 		start = getDatetimeFromSeries(dframes.iloc[[x], 0])
 		reactor = getReactor(x)
-		endP = getEndByP(x, reactor)
-		endT = getEndByT(x, reactor)#в excel строка соответствует i+2
-		toExcel(reactor, start, endP, endT)
+		endByP = getEndByP(x, reactor)
+		endByT = getEndByT(x, reactor)#в excel строка соответствует i+2
+		try:
+			duration = endByT - start
+			print(duration)
+		except TypeError as e:
+			duration = 'ошибка'
+		
+		MAIN_LIST.append({'Реактор':reactor, 'Начало синтеза':str(start), 'Конец синтеза': str(endByT), 'Длительность синтеза':str(duration) })
+		#toExcel(reactor, start, endP, endT)
 		pause = 12
 	x += 1
 	if pause > 0 :
 		pause -= 1
+
+
+pd.DataFrame(MAIN_LIST).to_excel('output.xlsx')
