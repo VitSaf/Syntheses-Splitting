@@ -7,7 +7,8 @@ from datetime import datetime, timedelta
 MAIN_LIST = []
 ERRORS_LIST = []
 SYNT_START_VALUE = 30000 #753 строка 2019
-MAX_SYNT_TIME = timedelta(hours = 2)
+#MAX_SYNT_TIME = timedelta(hours = 2)
+MAX_SYNT_TIME = 120
 BLOCK1_START_VALUE_CATALYST = 300
 BLOCK2_START_VALUE_BUTADIEN = 10000
 SHIV_START_VALUE = 10
@@ -136,7 +137,7 @@ def getSecondBlockStart(fromRow):
 			while True: #ищем конец слива бутадиена
 				if tmp[fromRow] < BLOCK2_START_VALUE_BUTADIEN:#нашли конец слива бутадиена
 					duration = getDatetimeFromSeries(dframes.iloc[[fromRow], 0]) - getDatetimeFromSeries(dframes.iloc[[butadienStartRow], 0])
-					return fromRow, butadienMass, duration
+					return fromRow, butadienMass/60, duration
 				butadienMass += tmp[fromRow]
 				fromRow += 1
 		fromRow += 1
@@ -144,7 +145,7 @@ def getSecondBlockStart(fromRow):
 #Возвращает дату окончания синтеза второго блока
 def getSecondBlockEnd(fromRow, reactor):
 	p = getPFromReactor(reactor)
-	row = fromRow + 20
+	row = fromRow + 20 #Добавить поиск глобального максимума давления
 	while True:
 		if p[row]>0.2 and p[row]>p[row -1] and p[row]>p[row+1]:
 			#return getDatetimeFromSeries(dframes.iloc[[row], 0])
@@ -186,7 +187,7 @@ def getSolventData(fromRow):
 			mass += solvent[fromRow]
 		else:
 			duration = getDatetimeFromSeries(dframes.iloc[[fromRow - 1], 0]) - getDatetimeFromSeries(dframes.iloc[[rowTmp], 0])
-			return mass, duration
+			return mass/60, duration
 		fromRow += 1
 #Возращает массу загруженного стирола, время слива
 def getStirolData(fromRow):
@@ -195,11 +196,11 @@ def getStirolData(fromRow):
 	while True:
 		if stirol[fromRow] > STIROL_START_VALUE:
 			rowTmp = fromRow
-			while True:
+			while True:#Цикл Дейкстры?
 				if stirol[fromRow] < STIROL_START_VALUE:
 					duration = getDatetimeFromSeries(dframes.iloc[[fromRow], 0]) - getDatetimeFromSeries(dframes.iloc[[rowTmp], 0])
 					#return rowTmp, fromRow, mass, duration
-					return mass, duration
+					return mass/60, duration
 				else:
 					mass += stirol[fromRow]
 					fromRow += 1
@@ -213,7 +214,7 @@ def getCatalystData(fromRow):
 		mass += catalyst[fromRow]
 		fromRow += 1
 	duration = getDatetimeFromSeries(dframes.iloc[[fromRow], 0]) - getDatetimeFromSeries(dframes.iloc[[rowTmp], 0])
-	return mass, duration
+	return mass/60, duration
 #градиент давления первого этапа, градиент давления второго этапа
 def getGradP(reactor, start1Row, end1Row, start2Row, end2Row):
 	p = getPFromReactor(reactor)
@@ -225,10 +226,13 @@ def getGradT(reactor, start1Row, end1Row, start2Row, end2Row):
 	return t[end1Row] - t[start1Row], t[end2Row] - t[start2Row]
 
 print("Start")
-dframes = join.loadTest() #TestData
-#dframes = join.load()
+#dframes = join.loadTest() #TestData
+dframes = join.load()
 print('dataframe загружен')
 #print(str(dframes.iloc[[5],0]))#iloc[[запись], столбец]
+
+def toMinutes(td):
+	return (td.seconds/60)%60
 
 	
 x = 0
@@ -267,16 +271,23 @@ for i in dframes[F_SOLVENT] :#Расходомер на растворителе
 			x += 1
 			continue
 
-		#print(reactor)
-		#print(block2StartDatetime)
-		#print(block1EndByPDatetime)
+
 		totalDuration = endByTDatetime - start
 		block1DurationByP = block1EndByPDatetime - block1StartDatetime
 		block1DurationByT = block1EndByTDatetime - block1StartDatetime
 		block2Duration = block2EndDatetime - block2StartDatetime
 		shivDuration = endByTDatetime - getDatetimeFromSeries(dframes.iloc[[startShiv], 0])
-
+		butadienDuration = toMinutes(butadienDuration)
+		solventDuration = toMinutes(solventDuration)
+		stirolDuration = toMinutes(stirolDuration)
+		catalystDuration = toMinutes(catalystDuration)
 		pauseBetweenBlock1AndBlock2 = block2StartDatetime - block1EndByPDatetime# ошибки из-за пересечения синтезов
+		totalDuration = toMinutes(totalDuration)
+		block1DurationByP = toMinutes(block1DurationByP)
+		block1DurationByT = toMinutes(block1DurationByT)
+		block2Duration = toMinutes(block2Duration)
+		shivDuration = toMinutes(shivDuration)
+		pauseBetweenBlock1AndBlock2 = toMinutes(pauseBetweenBlock1AndBlock2)
 
 		if totalDuration < MAX_SYNT_TIME:
 			MAIN_LIST.append({'Реактор':reactor, 'Начало синтеза':str(start), 'Конец синтеза': str(endByTDatetime), 'Длительность синтеза':str(totalDuration), 'Длительность первого блока по Р': str(block1DurationByP),
